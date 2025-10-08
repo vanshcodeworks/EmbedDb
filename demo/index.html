@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSM-Tree Visualization</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>LSM-Tree Interactive Demo</h1>
+
+    <div class="controls">
+        <div class="control-group">
+            <h3>Write Data</h3>
+            <input type="text" id="key-input" placeholder="Key">
+            <input type="text" id="value-input" placeholder="Value">
+            <button id="put-btn">Put (Key, Value)</button>
+        </div>
+        <div class="control-group">
+            <h3>Read Data</h3>
+            <input type="text" id="get-key-input" placeholder="Key to find">
+            <button id="get-btn">Get (Key)</button>
+        </div>
+        <div class="control-group">
+            <h3>Maintenance</h3>
+            <button id="compact-btn">Compact SSTables</button>
+            <button id="reset-btn">Reset Demo</button>
+        </div>
+    </div>
+
+    <div id="output-log" class="log-panel">
+        <p><strong>Status:</strong> Waiting for operations...</p>
+    </div>
+
+    <div class="system-view">
+        <div class="memory-components">
+            <h2>In-Memory (RAM)</h2>
+            <div class="component-container">
+                <div class="component">
+                    <h3>Write-Ahead Log (WAL)</h3>
+                    <div id="wal" class="wal-content"></div>
+                </div>
+                <div class="component">
+                    <h3>MemTable (Capacity: 5)</h3>
+                    <div id="memtable" class="memtable-content"></div>
+                </div>
+            </div>
+        </div>
+        <div class="disk-components">
+            <h2>On-Disk Storage</h2>
+            <div id="sstables-container" class="sstables-area">
+                </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
