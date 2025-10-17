@@ -7,10 +7,13 @@
 #include <iomanip>
 using namespace std;
 
+// getting current time in cpp
+//https://stackoverflow.com/questions/36751133/proper-method-of-using-stdchrono (yha se liya chrono)
+
 double getCurrentTime() {
     auto now = chrono::high_resolution_clock::now();
     auto ns = chrono::duration_cast<chrono::nanoseconds>(now.time_since_epoch());
-    return ns.count() / 1e9;
+    return ns.count() / 1e9; // ns to s conversion
 }
 
 
@@ -23,7 +26,9 @@ void runBenchmark(int numOps, int valueSize, bool shuffleKeys, int memtableMax) 
     }
     
     if (shuffleKeys) {
+        //Provides random number facilities like  (Mersenne Twister RNG).
         mt19937 rng(12345);
+        // using random inport yha shuffle kr denge jisse easy na ho put krna like 1 , 2 , 3,4 ki jagah 200 , 2 , 500
         shuffle(keys.begin(), keys.end(), rng);
     }
     
