@@ -12,9 +12,9 @@ bool Sstable::writeFile(const string& name, const MemTable& mem) {
     // Write how many entries we will store (header).
     long long count = mem.size();
     
-    f.write((const char*)&count, sizeof(count));
+    f.write((const char*)&count, sizeof(count));// This tells the reader how many key–values are stored.
 
-    for (auto& p : mem.items()) {
+    for (auto& p : mem.items()) { //Write each key-value pair
         long long k = p.first;           // the key to write
         const string& v = p.second;      // the value to write
         int len = (int)v.size();         // number of bytes in value
@@ -24,7 +24,7 @@ bool Sstable::writeFile(const string& name, const MemTable& mem) {
         // Write value length so we can read exact number of bytes later
         f.write((const char*)&len, sizeof(len));
         // Write value bytes if there is any content
-        if (len > 0) f.write(v.data(), len);
+        if (len > 0) f.write(v.data(), len); //Write key, value length, and bytes
     }
     return true;
 }

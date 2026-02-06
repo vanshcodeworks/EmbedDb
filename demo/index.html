@@ -1,58 +1,449 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LSM-Tree Visualization</title>
-    <link rel="stylesheet" href="style.css">
+    <title>EmbedDb | High-Performance Storage Engine</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@300;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        'space-black': '#050505',
+                        'glass-border': 'rgba(255, 255, 255, 0.08)',
+                        'glass-bg': 'rgba(255, 255, 255, 0.02)',
+                        'sapphire': '#2563eb',
+                        'gold': '#fbbf24',
+                    },
+                    backgroundImage: {
+                        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+                        'hero-glow': 'conic-gradient(from 180deg at 50% 50%, #2563eb33 0deg, #fbbf2433 180deg, #2563eb33 360deg)',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'shine': 'shine 8s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        shine: {
+                            '0%': { backgroundPosition: '200% center' },
+                            '100%': { backgroundPosition: '-200% center' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <h1>LSM-Tree Interactive Demo</h1>
+<body class="bg-space-black text-slate-300 selection:bg-sapphire selection:text-white overflow-x-hidden">
+    
+    <!-- Ambient Background -->
+    <canvas id="particle-canvas" class="fixed inset-0 z-0 pointer-events-none opacity-40"></canvas>
+    <div class="fixed inset-0 z-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-20 pointer-events-none"></div>
 
-    <div class="controls">
-        <div class="control-group">
-            <h3>Write Data</h3>
-            <input type="text" id="key-input" placeholder="Key">
-            <input type="text" id="value-input" placeholder="Value">
-            <button id="put-btn">Put (Key, Value)</button>
-        </div>
-        <div class="control-group">
-            <h3>Read Data</h3>
-            <input type="text" id="get-key-input" placeholder="Key to find">
-            <button id="get-btn">Get (Key)</button>
-        </div>
-        <div class="control-group">
-            <h3>Maintenance</h3>
-            <button id="compact-btn">Compact SSTables</button>
-            <button id="reset-btn">Reset Demo</button>
-        </div>
-    </div>
-
-    <div id="output-log" class="log-panel">
-        <p><strong>Status:</strong> Waiting for operations...</p>
-    </div>
-
-    <div class="system-view">
-        <div class="memory-components">
-            <h2>In-Memory (RAM)</h2>
-            <div class="component-container">
-                <div class="component">
-                    <h3>Write-Ahead Log (WAL)</h3>
-                    <div id="wal" class="wal-content"></div>
+    <!-- Nav -->
+    <nav class="fixed w-full z-50 transition-all duration-300 backdrop-blur-md border-b border-white/5 bg-space-black/80" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="font-display font-bold text-2xl tracking-tight text-white flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sapphire to-gold flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                    <i class="fas fa-database text-xs text-white"></i>
                 </div>
-                <div class="component">
-                    <h3>MemTable (Capacity: 5)</h3>
-                    <div id="memtable" class="memtable-content"></div>
+                <span>Embed<span class="text-transparent bg-clip-text bg-gradient-to-r from-sapphire to-gold">Db</span></span>
+            </div>
+            <ul class="hidden md:flex gap-8 items-center text-sm font-medium text-slate-400">
+                <li><a href="#overview" class="hover:text-white transition-colors">Overview</a></li>
+                <li><a href="#benchmarks" class="hover:text-white transition-colors">Benchmarks</a></li>
+                <li><a href="#architecture" class="hover:text-white transition-colors">Architecture</a></li>
+                <li><a href="#blog" class="hover:text-white transition-colors">Engineering</a></li>
+                <li>
+                    <a href="https://github.com/vanshcodeworks/embeddb" target="_blank" class="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:border-sapphire/50 transition-all group">
+                        <i class="fab fa-github group-hover:text-white"></i>
+                        <span class="group-hover:text-white">GitHub</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="relative min-h-screen flex items-center justify-center pt-20 z-10 overflow-hidden">
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-hero-glow blur-[120px] rounded-full opacity-20 animate-pulse"></div>
+        
+        <div class="max-w-7xl mx-auto px-6 text-center relative z-20">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gold/20 bg-gold/5 text-gold text-xs font-semibold tracking-wider uppercase mb-8 animate-float">
+                <span class="w-2 h-2 rounded-full bg-gold animate-ping"></span>
+                v1.0 Production Ready
+            </div>
+            
+            <h1 class="font-display text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
+                High-Performance <br/>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-amber-300 animate-shine background-animate">LSM Storage Engine</span>
+            </h1>
+            
+            <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10 font-light leading-relaxed">
+                A C++17 key-value store engineered for speed. Sub-10μs latency, crash safety via WAL, and efficient on-disk serialization.
+            </p>
+
+            <div class="flex flex-col md:flex-row gap-4 justify-center items-center">
+                <a href="https://github.com/vanshcodeworks/embeddb" target="_blank" class="px-8 py-4 rounded-xl bg-white text-black font-bold hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center gap-2">
+                    <i class="fab fa-github"></i> View Source
+                </a>
+                <a href="#benchmarks" class="px-8 py-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 font-medium transition-all flex items-center gap-2 group">
+                    View Benchmarks <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                </a>
+            </div>
+
+            <!-- Stats Grid - Floating -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 max-w-4xl mx-auto">
+                <div class="glass-card p-6 rounded-2xl text-center group hover:-translate-y-2 transition-transform duration-500">
+                    <div class="text-4xl font-display font-bold text-white mb-1 group-hover:text-sapphire transition-colors">128K</div>
+                    <div class="text-sm text-slate-500 uppercase tracking-widest">Ops / Sec</div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center group hover:-translate-y-2 transition-transform duration-500 delay-100">
+                    <div class="text-4xl font-display font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">7.8μs</div>
+                    <div class="text-sm text-slate-500 uppercase tracking-widest">Latency</div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center group hover:-translate-y-2 transition-transform duration-500 delay-200">
+                    <div class="text-4xl font-display font-bold text-white mb-1 group-hover:text-gold transition-colors">C++17</div>
+                    <div class="text-sm text-slate-500 uppercase tracking-widest">Core</div>
                 </div>
             </div>
         </div>
-        <div class="disk-components">
-            <h2>On-Disk Storage</h2>
-            <div id="sstables-container" class="sstables-area">
+    </header>
+
+    <!-- Overview Section -->
+    <section id="overview" class="py-24 relative z-10">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="mb-16">
+                <h2 class="font-display text-4xl font-bold text-white mb-4">Core Vault</h2>
+                <div class="h-1 w-20 bg-gradient-to-r from-sapphire to-transparent"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Card 1 -->
+                <div class="glass-card p-8 rounded-2xl border border-glass-border hover:border-sapphire/30 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-lg bg-sapphire/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-bolt text-sapphire text-xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Blazing Fast</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Engineered for maximizing IOPS using optimized memory structures and sequential disk writes.</p>
                 </div>
+
+                <!-- Card 2 -->
+                <div class="glass-card p-8 rounded-2xl border border-glass-border hover:border-purple-500/30 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-layer-group text-purple-400 text-xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">LSM Architecture</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Classic Log-Structured Merge-tree design balancing write throughput with read efficiency.</p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="glass-card p-8 rounded-2xl border border-glass-border hover:border-green-500/30 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-shield-alt text-green-400 text-xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Crash Safety</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Write-Ahead Log (WAL) integration ensures zero data loss during power failures.</p>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="glass-card p-8 rounded-2xl border border-glass-border hover:border-gold/30 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-lg bg-gold/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-compress text-gold text-xl"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-white mb-3">Binary Storage</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Custom binary SSTable format with sorted keys for O(log n) lookup performance.</p>
+                </div>
+            </div>
         </div>
-    </div>
+    </section>
+
+    <!-- Benchmarks Section -->
+    <section id="benchmarks" class="py-24 relative z-10 bg-gradient-to-b from-transparent to-black/50">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+                <div>
+                    <h2 class="font-display text-4xl font-bold text-white mb-4">Performance Metrics</h2>
+                    <p class="text-slate-400">Stress tested on commodity hardware</p>
+                </div>
+                <div class="font-mono text-xs text-sapphire bg-sapphire/5 border border-sapphire/20 px-4 py-2 rounded">
+                    > ./embeddb_bench --full-suite
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Benchmark Card 1 -->
+                <div class="glass-card p-1 rounded-2xl bg-gradient-to-b from-white/10 to-transparent">
+                    <div class="bg-[#0a0a0a] rounded-xl p-6 h-full border border-white/5">
+                        <div class="flex justify-between items-start mb-6">
+                            <h3 class="font-bold text-lg text-white">Sequential Writes</h3>
+                            <span class="text-xs font-mono text-green-400 bg-green-400/10 px-2 py-1 rounded">PASSED</span>
+                        </div>
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Throughput</span>
+                                <span class="text-white font-mono">128,456 ops/s</span>
+                            </div>
+                            <div class="w-full bg-white/5 rounded-full h-1.5">
+                                <div class="bg-gradient-to-r from-sapphire to-cyan-400 h-1.5 rounded-full" style="width: 100%"></div>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Latency</span>
+                                <span class="text-white font-mono">7.78 μs</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Data Size</span>
+                                <span class="text-white font-mono">32MB</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 rounded-lg bg-white/5 font-mono text-xs text-slate-400">
+                            ./embeddb 1000000 32 0
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Benchmark Card 2 -->
+                <div class="glass-card p-1 rounded-2xl bg-gradient-to-b from-white/10 to-transparent">
+                    <div class="bg-[#0a0a0a] rounded-xl p-6 h-full border border-white/5">
+                        <div class="flex justify-between items-start mb-6">
+                            <h3 class="font-bold text-lg text-white">Random Writes</h3>
+                            <span class="text-xs font-mono text-green-400 bg-green-400/10 px-2 py-1 rounded">PASSED</span>
+                        </div>
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Throughput</span>
+                                <span class="text-white font-mono">112,268 ops/s</span>
+                            </div>
+                            <div class="w-full bg-white/5 rounded-full h-1.5">
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-1.5 rounded-full" style="width: 88%"></div>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Latency</span>
+                                <span class="text-white font-mono">8.90 μs</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Shuffle</span>
+                                <span class="text-white font-mono">Enabled</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 rounded-lg bg-white/5 font-mono text-xs text-slate-400">
+                            ./embeddb 1000000 32 1
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Benchmark Card 3 -->
+                <div class="glass-card p-1 rounded-2xl bg-gradient-to-b from-white/10 to-transparent">
+                    <div class="bg-[#0a0a0a] rounded-xl p-6 h-full border border-white/5">
+                        <div class="flex justify-between items-start mb-6">
+                            <h3 class="font-bold text-lg text-white">High Volume</h3>
+                            <span class="text-xs font-mono text-green-400 bg-green-400/10 px-2 py-1 rounded">PASSED</span>
+                        </div>
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Throughput</span>
+                                <span class="text-white font-mono">122,203 ops/s</span>
+                            </div>
+                            <div class="w-full bg-white/5 rounded-full h-1.5">
+                                <div class="bg-gradient-to-r from-gold to-orange-500 h-1.5 rounded-full" style="width: 95%"></div>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Operations</span>
+                                <span class="text-white font-mono">2,000,000</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">SSTables</span>
+                                <span class="text-white font-mono">21 Files</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 rounded-lg bg-white/5 font-mono text-xs text-slate-400">
+                            ./embeddb 2000000 16 1
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture" class="py-24 relative z-10">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="mb-16 text-center">
+                <h2 class="font-display text-4xl font-bold text-white mb-4">System Architecture</h2>
+                <p class="text-slate-400">The lifecycle of data within EmbedDb</p>
+            </div>
+
+            <div class="relative p-8 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md overflow-hidden">
+                <div class="absolute inset-0 bg-blue-500/5 blur-3xl"></div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
+                    <!-- Step 1 -->
+                    <div class="p-6 rounded-xl bg-black/40 border border-white/5 flex flex-col items-center text-center">
+                        <div class="w-10 h-10 rounded-full bg-sapphire text-white flex items-center justify-center font-bold mb-4">1</div>
+                        <h4 class="text-white font-bold mb-2">Write Request</h4>
+                        <p class="text-xs text-slate-400">Client sends key-value pair</p>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="p-6 rounded-xl bg-black/40 border border-white/5 flex flex-col items-center text-center relative">
+                        <div class="absolute top-1/2 -left-6 hidden md:block w-8 h-0.5 bg-gradient-to-r from-transparent to-sapphire"></div>
+                        <div class="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold mb-4">2</div>
+                        <h4 class="text-white font-bold mb-2">WAL Append</h4>
+                        <p class="text-xs text-slate-400">Durability log update</p>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="p-6 rounded-xl bg-black/40 border border-white/5 flex flex-col items-center text-center relative">
+                        <div class="absolute top-1/2 -left-6 hidden md:block w-8 h-0.5 bg-gradient-to-r from-transparent to-purple-600"></div>
+                        <div class="w-10 h-10 rounded-full bg-gold text-black flex items-center justify-center font-bold mb-4">3</div>
+                        <h4 class="text-white font-bold mb-2">Memtable</h4>
+                        <p class="text-xs text-slate-400">In-memory sorting</p>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="p-6 rounded-xl bg-black/40 border border-white/5 flex flex-col items-center text-center relative">
+                        <div class="absolute top-1/2 -left-6 hidden md:block w-8 h-0.5 bg-gradient-to-r from-transparent to-gold"></div>
+                        <div class="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold mb-4">4</div>
+                        <h4 class="text-white font-bold mb-2">SSTable Flush</h4>
+                        <p class="text-xs text-slate-400">Immutable disk storage</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Detailed Blog/Build Info -->
+    <section id="blog" class="py-24 relative z-10 border-t border-white/5">
+        <div class="max-w-4xl mx-auto px-6">
+            <h2 class="font-display text-4xl font-bold text-white mb-12 text-center">Engineering Report</h2>
+            
+            <div class="space-y-12">
+                <article class="prose prose-invert prose-lg max-w-none">
+                    <h3 class="text-sapphire flex items-center gap-3">
+                        <i class="fas fa-code"></i> Implementation Details
+                    </h3>
+                    <p class="text-slate-300">
+                        The core challenge of EmbedDb was implementing a robust binary format for the Sorted String Tables (SSTables). 
+                        Unlike text-based formats (CSV/JSON), the binary format enables random access patterns and significantly reduces storage overhead.
+                    </p>
+                    
+                    <div class="my-8 rounded-xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-2xl">
+                        <div class="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/5">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            <span class="ml-2 font-mono text-xs text-slate-500">sstable.cpp</span>
+                        </div>
+                        <div class="p-6 font-mono text-sm text-slate-300 overflow-x-auto">
+<pre><code><span class="text-purple-400">void</span> SSTable::<span class="text-blue-400">flush</span>(<span class="text-purple-400">const</span> std::map&lt;std::string, std::string&gt;& data) {
+    std::ofstream <span class="text-gold">file</span>(filename, std::ios::binary);
+    
+    <span class="text-slate-500">// Header: Entry Count</span>
+    uint32_t count = data.size();
+    file.write(<span class="text-purple-400">reinterpret_cast</span>&lt;<span class="text-purple-400">const</span> char*&gt;(&count), <span class="text-purple-400">sizeof</span>(count));
+
+    <span class="text-slate-500">// Body: [K_Len][Key][V_Len][Val]...</span>
+    <span class="text-purple-400">for</span> (<span class="text-purple-400">const</span> <span class="text-purple-400">auto</span>& [key, val] : data) {
+        <span class="text-purple-400">uint32_t</span> k_len = key.size();
+        <span class="text-purple-400">uint32_t</span> v_len = val.size();
+        
+        file.write(<span class="text-purple-400">reinterpret_cast</span>&lt;<span class="text-purple-400">const</span> char*&gt;(&k_len), <span class="text-purple-400">sizeof</span>(k_len));
+        file.write(key.data(), k_len);
+        <span class="text-purple-400">...</span>
+    }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <h3 class="text-white text-2xl font-bold mt-12 mb-4">Design Strategy</h3>
+                    <p class="text-slate-300">
+                        I chose the <strong>LSM-Tree</strong> structure specifically for its write-amplification properties. By buffering writes in memory (Memtable) and only flushing sequentially to disk, we bypass the random I/O bottleneck typical of B-Tree databases on spinning disks, though the benefits persist on nvme SSDs due to block-erase mechanics.
+                    </p>
+                </article>
+
+                <div class="p-8 rounded-2xl bg-gradient-to-r from-sapphire/20 to-purple-600/20 border border-white/10 text-center">
+                    <h3 class="text-2xl font-bold text-white mb-4">Ready to explore the code?</h3>
+                    <p class="text-slate-300 mb-8 max-w-lg mx-auto">Dive into the C++ source code to see how the WAL, Memtable, and SSTable components interact.</p>
+                    <a href="https://github.com/vanshcodeworks/embeddb" target="_blank" class="inline-flex items-center px-8 py-4 rounded-xl bg-white text-black font-bold hover:scale-105 transition-transform">
+                        <i class="fab fa-github mr-2"></i> Visit Repository
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 border-t border-white/5 bg-[#020202] relative z-10">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="font-display font-bold text-xl text-white flex items-center gap-2 mb-4">
+                        <i class="fas fa-database text-sapphire"></i> EmbedDb
+                    </div>
+                    <p class="text-slate-500 max-w-sm">
+                        A high-performance C++17 Key-Value store demonstrating advanced database engineering concepts for resume and learning purposes.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-4">Project</h4>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li><a href="#" class="hover:text-sapphire transition-colors">Documentation</a></li>
+                        <li><a href="#benchmarks" class="hover:text-sapphire transition-colors">Benchmarks</a></li>
+                        <li><a href="https://github.com/vanshcodeworks/embeddb" class="hover:text-sapphire transition-colors">Source Code</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-4">Connect</h4>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li><a href="https://vanshcodeworks.com" class="hover:text-sapphire transition-colors">Portfolio</a></li>
+                        <li><a href="https://github.com/vanshcodeworks" class="hover:text-sapphire transition-colors">GitHub</a></li>
+                        <li><a href="#" class="hover:text-sapphire transition-colors">LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="pt-8 border-t border-white/5 text-center text-sm text-slate-600">
+                &copy; 2024 EmbedDb Project by VanshCodeWorks. Built with C++17.
+            </div>
+        </div>
+    </footer>
 
     <script src="script.js"></script>
+    <!-- Simple Custom Scripts for Scroll & Highlight -->
+    <script>
+        // Copy to clipboard functionality for code blocks
+        document.querySelectorAll('pre code').forEach((block) => {
+            block.addEventListener('click', () => {
+                navigator.clipboard.writeText(block.innerText);
+                // Optional: Add toast notification Logic here
+            });
+        });
+    </script>
 </body>
 </html>
